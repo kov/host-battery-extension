@@ -1,0 +1,19 @@
+{
+    "name": "SSH Host Battery",
+    "description": "Use ssh to call a command on the host to get battery status.",
+    "uuid": "SshHostBattery@kov",
+    "shell-version": [
+        "3.28",
+        "3.30",
+        "3.32",
+        "3.34",
+        "3.36",
+        "3.38",
+        "40"
+    ],
+    "gettext-domain": "br.dev.kov.SshHostBattery",
+    "settings-schema": "br.dev.kov.SshHostBattery",
+    "url": "https://github.com/kov/SshHostBattery/",
+    "author": "Gustavo Noronha Silva",
+    "version": 1
+}
