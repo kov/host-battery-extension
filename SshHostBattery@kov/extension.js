@@ -1,4 +1,3 @@
-/* -*- mode: js2; js2-basic-offset: 4; indent-tabs-mode: nil -*- */
 /* exported init, enable, disable */
 
 /*
@@ -20,107 +19,107 @@
  * along with SshHostBattery. If not, see <http://www.gnu.org/licenses/>.
  */
 
-'use strict';
+'use strict'
 
-const { St, GObject, GLib, Shell, Gio, Clutter } = imports.gi;
+const { St, GObject, GLib, Shell, Gio, Clutter } = imports.gi
 
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
+const Main = imports.ui.main
+const PanelMenu = imports.ui.panelMenu
+const INTERVAL = 60
+const INDICATOR_NAME = 'Host Battery Indicator'
 
-const Util = imports.misc.util;
-const Config = imports.misc.config;
-const ExtensionUtils = imports.misc.extensionUtils;
-
-const Gettext = imports.gettext.domain('br.dev.kov.SshHostBattery');
-const _ = Gettext.gettext;
-
-const Me = ExtensionUtils.getCurrentExtension();
-
-const IndicatorName = Me.metadata['name'];
-
-const SHELL_MINOR = parseInt(Config.PACKAGE_VERSION.split('.')[1]);
-const INTERVAL = 60;
-
-var SshHostBatteryIndicator = null;
+var SshHostBatteryIndicator = null
 
 const SshHostBattery = GObject.registerClass(
     class SshHostBattery extends PanelMenu.Button {
         _init(params) {
-            super._init(params, IndicatorName);
+            super._init(params, INDICATOR_NAME)
 
-            // Create UI
-            this.box = new St.BoxLayout();
+            this.box = new St.BoxLayout()
 
-            // Icon
-            this.batteryIco = new St.Icon({
-                gicon: Gio.icon_new_for_string('/usr/share/icons/Adwaita/scalable/legacy/battery-full-symbolic.svg'),
+            this.battery_icon = new St.Icon({
+                gicon: Gio.icon_new_for_string('/usr/share/icons/Adwaita/scalable/status/battery-level-100-charged-symbolic.svg'),
                 style_class: 'system-status-icon'
-            });
+            })
 
-            // Label
             this.battery = new St.Label({
                 y_align: Clutter.ActorAlign.CENTER,
                 text: '--',
                 style_class: 'label'
-            });
+            })
 
-            this.box.add(this.batteryIco);
-            this.box.add(this.battery);
-            this.actor.add_actor(this.box);
+            this.box.add(this.battery_icon)
+            this.box.add(this.battery)
+            this.actor.add_actor(this.box)
 
-            /** ### Setup Refresh Timer ### **/
-            this.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, INTERVAL, this._refresh.bind(this));
+            // Our first refresh should be quick once we boot up, but then we fall into the
+            // regular cadence.
+            this.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 5, this._first_refresh.bind(this))
+            this.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, INTERVAL, this._refresh.bind(this))
         }
 
         destroy() {
             if (this.timer) {
-                GLib.source_remove(this.timer);
-                this.timer = null;
+                GLib.source_remove(this.timer)
+                this.timer = null
             }
 
-            super.destroy();
+            super.destroy()
         }
 
-        /*********************/
+        _first_refresh() {
+            this._refresh()
+            return GLib.SOURCE_REMOVE
+        }
 
         _refresh() {
-              const command = ['ssh', 'gustavos-macbook-air.local', 'host-battery-status'];
-              try {
-                  let proc = Gio.Subprocess.new( command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE );
-                  // The callback is a force exit as there is no need for process communication
-                  proc.communicate_utf8_async(null, null, (proc, res) => {
-                      try {
-                          let [, stdout, stderr] = proc.communicate_utf8_finish(res);
+            const command = ['ssh', 'gustavos-macbook-air.local', 'host-battery-status']
+            try {
+                let proc = Gio.Subprocess.new( command, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE )
+                proc.communicate_utf8_async(null, null, (proc, res) => {
+                try {
+                    let [, stdout, stderr] = proc.communicate_utf8_finish(res)
 
-                          if (proc.get_successful()) {
-                              this.battery.text = stdout;
-                          } else {
-                              log(stderr);
-                              this.battery.text = 'FAIL';
-                          }
-                      } catch (e) {
-                          logError(e);
-                      }
-                  });
-              } catch (e) {
-                  logError(e);
-              }
-            return GLib.SOURCE_CONTINUE;
+                    if (proc.get_successful()) {
+                            let number = stdout.replace('%', '')
+                            let icon_path = '/usr/share/icons/Adwaita/scalable/status/'
+                            if (number == '100') {
+                                icon_path += 'battery-level-100-charged-symbolic.svg'
+                            } else {
+                                number = number.slice(0, 1) + '0'
+                                icon_path += 'battery-level-' + number + '-symbolic.svg'
+                            }
+                            this.battery_icon.set_gicon(
+                                Gio.icon_new_for_string(icon_path)
+                            )
+                            this.battery.text = stdout
+                        } else {
+                            log(stderr)
+                            this.battery.text = 'FAIL'
+                        }
+                    } catch (e) {
+                        logError(e)
+                    }
+                })
+            } catch (e) {
+                logError(e)
+            }
+            return GLib.SOURCE_CONTINUE
         }
     }
-);
+)
 
 function init() {
 }
 
 function enable() {
-    SshHostBatteryIndicator = new SshHostBattery();
-    Main.panel.addToStatusArea(IndicatorName, SshHostBatteryIndicator);
+    SshHostBatteryIndicator = new SshHostBattery()
+    Main.panel.addToStatusArea(INDICATOR_NAME, SshHostBatteryIndicator)
 }
 
 function disable() {
     if (SshHostBatteryIndicator !== null) {
-        SshHostBatteryIndicator.destroy();
-        SshHostBatteryIndicator = null;
+        SshHostBatteryIndicator.destroy()
+        SshHostBatteryIndicator = null
     }
 }
