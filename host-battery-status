@@ -1,0 +1,16 @@
+#!/opt/homebrew/bin/fish
+set output (pmset -g batt)
+
+# When charging or discharging, we get the %.
+if echo $output | grep -q '100%; charged';
+    echo -n 'charged:100%'
+else if echo $output | egrep -q '(charging|finishing)';
+    if echo $output | grep -q discharging;
+        echo -n discharging:
+    else
+        echo -n charging:
+    end
+    echo $output | tr '\n' ' ' 2>%1 | gsed 's/.*\t\([0-9]\+%\).*/\1/g'
+else
+    echo 'charged:WAT%'
+end 
