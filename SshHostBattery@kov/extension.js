@@ -25,7 +25,7 @@ const { St, GObject, GLib, Shell, Gio, Clutter } = imports.gi
 
 const Main = imports.ui.main
 const PanelMenu = imports.ui.panelMenu
-const INTERVAL = 60
+const INTERVAL = 5
 const INDICATOR_NAME = 'Host Battery Indicator'
 
 var SshHostBatteryIndicator = null
@@ -52,9 +52,6 @@ const SshHostBattery = GObject.registerClass(
             this.box.add(this.battery)
             this.actor.add_actor(this.box)
 
-            // Our first refresh should be quick once we boot up, but then we fall into the
-            // regular cadence.
-            this.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 5, this._first_refresh.bind(this))
             this.timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, INTERVAL, this._refresh.bind(this))
         }
 
@@ -67,11 +64,6 @@ const SshHostBattery = GObject.registerClass(
             super.destroy()
         }
 
-        _first_refresh() {
-            this._refresh()
-            return GLib.SOURCE_REMOVE
-        }
-
         _refresh() {
             const command = ['ssh', 'gustavos-macbook-air.local', 'host-battery-status']
             try {
@@ -81,18 +73,27 @@ const SshHostBattery = GObject.registerClass(
                     let [, stdout, stderr] = proc.communicate_utf8_finish(res)
 
                     if (proc.get_successful()) {
-                            let number = stdout.replace('%', '')
+                            let parts = stdout.split(':')
+                            let state = parts[0]
+                            let percentage = parts[1]
+                            this.battery.text = percentage
+
                             let icon_path = '/usr/share/icons/Adwaita/scalable/status/'
+                            let number = percentage.replace('%', '')
                             if (number == '100') {
                                 icon_path += 'battery-level-100-charged-symbolic.svg'
                             } else {
+                                if (state != 'charging') {
+                                    state = ''
+                                } else {
+                                    state = '-' + state
+                                }
                                 number = number.slice(0, 1) + '0'
-                                icon_path += 'battery-level-' + number + '-symbolic.svg'
+                                icon_path += 'battery-level-' + number + state + '-symbolic.svg'
                             }
                             this.battery_icon.set_gicon(
                                 Gio.icon_new_for_string(icon_path)
                             )
-                            this.battery.text = stdout
                         } else {
                             log(stderr)
                             this.battery.text = 'FAIL'
